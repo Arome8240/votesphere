@@ -1,0 +1,15 @@
+{
+  "name": "votesphere",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build:backend": "yarn workspace @votesphere/backend build",
+    "deploy:backend": "yarn workspace @votesphere/backend deploy",
+    "start:frontend": "yarn workspace @votesphere/frontend start",
+    "android": "yarn workspace @votesphere/frontend android",
+    "ios": "yarn workspace @votesphere/frontend ios"
+  }
+}
