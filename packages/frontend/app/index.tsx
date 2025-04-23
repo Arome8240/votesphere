@@ -1,107 +1,51 @@
-//import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
-import { ellipsify } from "@/utils/ellipsify";
 import { useAuthorization } from "@/utils/useAuthorization";
 import { useMobileWallet } from "@/utils/useMobileWallet";
 import { Link } from "expo-router";
 import { Pressable, View } from "react-native";
-import React, { useEffect, useMemo, useCallback, useState } from "react";
-import {
-  fetchAllPolls,
-  getCounter,
-  getProvider,
-  getReadonlyProvider,
-  initialize,
-} from "@/utils/blockhain";
-import { Poll } from "@/utils/interfaces";
-import {
-  Connection,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SystemProgram,
-  TransactionMessage,
-  TransactionSignature,
-  VersionedTransaction,
-} from "@solana/web3.js";
-import { useConnection } from "@/utils/ConnectionProvider";
-import { useQuery } from "@tanstack/react-query";
-import { Program, AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import idl from "../../backend/target/idl/backend.json";
-import { Backend } from "../../backend/target/types/backend";
+import React, { useCallback, useState } from "react";
+import { getProvider, initialize } from "@/utils/blockhain";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCounterProgram } from "@/utils/useCounter";
+import { BN } from "@coral-xyz/anchor";
+import { useConnection } from "@/utils/ConnectionProvider";
+import { usePoll } from "@/utils/useCreatePoll";
 
 export default function Index() {
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [authorizationInProgress, setAuthorizationInProgress] = useState(false);
+  const { polls, createPoll, createCounter, count } = usePoll();
+
+  //console.log(polls.data);
+
+  const start = Math.floor(new Date("2025-04-22").getTime() / 1000);
+  const end = Math.floor(new Date("2025-08-20").getTime() / 1000);
 
   const { connection } = useConnection();
   const { authorizeSession, selectedAccount } = useAuthorization();
   const { connect, disconnect } = useMobileWallet();
-
-  const { data: counter } = useQuery({
-    queryKey: ["counter", selectedAccount?.publicKey.toString()],
-    queryFn: async () => {
-      if (!selectedAccount) return null;
-      const program = getReadonlyProvider();
-      if (!program) return null;
-      return await getCounter(program);
-    },
-    enabled: !!selectedAccount,
-  });
-
-  const {
-    data: polls,
-    isLoading: isLoadingPolls,
-    error: pollsError,
-  } = useQuery({
-    queryKey: ["polls"],
-    queryFn: async () => {
-      try {
-        console.log("[Polls Query] Starting fetch");
-        const program = getReadonlyProvider();
-        console.log("[Polls Query] Program:", program);
-        if (!program) {
-          console.log("[Polls Query] No Program available");
-          return [];
-        }
-        console.log("[Polls Query] Fetching polls...");
-        const polls = await fetchAllPolls(program);
-        console.log("[Polls Query] Fetched polls:", polls);
-        return polls;
-      } catch (error) {
-        console.error("[Polls Query] Error:", error);
-        throw error;
-      }
-    },
-  });
-
-  useEffect(() => {
-    if (counter !== undefined && counter !== null) {
-      setIsInitialized(counter.toNumber() >= 0);
-    }
-  }, [counter]);
+  const { counterAccount } = useCounterProgram();
 
   const handleConnectPress = useCallback(async () => {
+    if (authorizationInProgress) return;
+    setAuthorizationInProgress(true);
+
     try {
-      if (authorizationInProgress) {
-        return;
-      }
-      setAuthorizationInProgress(true);
       await connect();
 
-      // Initialize after connecting
       if (selectedAccount?.publicKey && authorizeSession && connection) {
         const program = getProvider(
           selectedAccount.publicKey,
           authorizeSession,
           connection.sendTransaction
         );
+
         if (program) {
-          await initialize(program, selectedAccount.publicKey);
+          await initialize(program);
           setIsInitialized(true);
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error during connect/initialize:", err);
     } finally {
       setAuthorizationInProgress(false);
@@ -114,18 +58,17 @@ export default function Index() {
   ]);
 
   const handleDisconnect = useCallback(async () => {
+    if (authorizationInProgress) return;
+    setAuthorizationInProgress(true);
+
     try {
-      if (authorizationInProgress) {
-        return;
-      }
-      setAuthorizationInProgress(true);
       await disconnect();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error during disconnect:", err);
     } finally {
       setAuthorizationInProgress(false);
     }
-  }, [authorizationInProgress, authorizeSession]);
+  }, [authorizationInProgress]);
 
   return (
     <SafeAreaView className="flex-1 p-5 bg-white">
@@ -158,58 +101,62 @@ export default function Index() {
           </Pressable>
         )}
       </View>
+
       <View className="mt-5">
         <View className="flex-row items-center justify-between">
           <Text size="3xl" className="text-blue-700">
-            Polls
+            Polls{" "}
+            {counterAccount.data?.count instanceof BN
+              ? counterAccount.data.count.toString()
+              : "0"}
           </Text>
 
-          <Link href="/polls/create" asChild>
-            <Pressable>
-              <Text size="lg" className="text-blue-700">
-                Create Poll
-              </Text>
+          {!count.data?.count && (
+            <Pressable onPress={() => createCounter.mutateAsync()}>
+              <Text className="text-red-600">Create Counter</Text>
             </Pressable>
-          </Link>
+          )}
+
+          <Pressable
+            onPress={async () => {
+              try {
+                const result = await createPoll.mutateAsync({
+                  description: "Just testing",
+                  start,
+                  end,
+                });
+                console.log("Poll created successfully:", result);
+              } catch (error) {
+                console.error("Error creating poll:", error);
+              }
+            }}
+          >
+            <Text size="lg" className="text-blue-700">
+              Create Poll
+            </Text>
+          </Pressable>
         </View>
 
-        <View className="mt-8 gap-y-4">
-          {pollsError ? (
-            <Text className="text-red-500">
-              Error loading polls: {pollsError.message}
-            </Text>
-          ) : isLoadingPolls ? (
-            <Text>Loading polls...</Text>
-          ) : polls && polls.length > 0 ? (
-            polls.map((poll) => (
-              <Link
-                key={poll.publicKey}
-                href={`/polls/${poll.publicKey}`}
-                asChild
-              >
-                <Pressable className="gap-2 p-2 border border-blue-700 rounded-md bg-blue-50">
-                  <Text bold={true} className="text-blue-600" size="xl">
-                    {poll.description}
-                  </Text>
-
-                  <Text size="lg" className="font-ubuntu-medium">
-                    Candidates: {poll.candidates}
-                  </Text>
-                  <View className="flex-row gap-x-2">
-                    <Text size="lg">
-                      Start: {new Date(poll.start).toLocaleDateString()}
-                    </Text>
-                    <Text size="lg">
-                      End: {new Date(poll.end).toLocaleDateString()}
-                    </Text>
-                  </View>
-                </Pressable>
-              </Link>
-            ))
+        <View>
+          {polls.isPending ? (
+            <Text size="2xl">Loading polls</Text>
+          ) : (polls?.data?.length ?? 0) < 1 ? (
+            <Text>No Polls</Text>
           ) : (
-            <Text>No polls available</Text>
+            <View>
+              {polls?.data?.map((poll, index) => (
+                <Text key={index}>{poll.description}</Text>
+              ))}
+            </View>
+          )}
+
+          {polls.isError && (
+            <Text>Error loading polls: {polls.error.message}</Text>
           )}
         </View>
+
+        {/* Uncomment when you integrate polls fetching */}
+        {/* <PollList /> */}
       </View>
     </SafeAreaView>
   );

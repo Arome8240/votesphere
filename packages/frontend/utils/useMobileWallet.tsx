@@ -1,4 +1,7 @@
-import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
+import {
+  transact,
+  Web3MobileWallet,
+} from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
 import { Account, useAuthorization } from "./useAuthorization";
 import {
   Transaction,
@@ -79,6 +82,21 @@ export function useMobileWallet() {
     [authorizeSession]
   );
 
+  const signTransactions = useCallback(
+    async <T extends Transaction | VersionedTransaction>(
+      transactions: T[]
+    ): Promise<T[]> => {
+      return await transact(async (wallet: Web3MobileWallet) => {
+        await authorizeSession(wallet);
+        const signedTransactions = await wallet.signTransactions({
+          transactions,
+        });
+        return signedTransactions;
+      });
+    },
+    [authorizeSession]
+  );
+
   return useMemo(
     () => ({
       connect,
@@ -87,6 +105,7 @@ export function useMobileWallet() {
       signAndSendTransaction,
       signMessage,
       signTransaction,
+      signTransactions,
     }),
     [signAndSendTransaction, signMessage]
   );

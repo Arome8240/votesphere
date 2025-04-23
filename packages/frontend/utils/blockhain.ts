@@ -1,3 +1,4 @@
+"use client";
 import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import {
   Connection,
@@ -13,6 +14,11 @@ import {
 import idl from "../../backend/target/idl/backend.json";
 import { Backend } from "../../backend/target/types/backend";
 import { Candidate, Poll } from "@/utils/interfaces";
+import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
+import { Base64 } from "js-base64";
+import { useAnchorWallet } from "./useAnchorWallet";
+
+//const anchorWallet = useAnchorWallet();
 
 const programId = new PublicKey(idl.address);
 const RPC_URL =
@@ -68,12 +74,17 @@ export const getReadonlyProvider = (): Program<Backend> => {
 
 export const getCounter = async (program: Program<Backend>): Promise<BN> => {
   try {
+    // console.log("ds", program.programId);
     const [counterPDA] = PublicKey.findProgramAddressSync(
       [Buffer.from("counter")],
       program.programId
     );
 
+    //console.log("sdd", counterPDA);
+
     const counter = await program.account.counter.fetch(counterPDA);
+
+    //console.log(program.programId, counter);
 
     if (!counter) {
       console.warn("No counter found, returning zero");
@@ -113,45 +124,180 @@ export const getProviderWithKeypair = (
 const keypair = Keypair.generate();
 
 export const initialize = async (
-  program: Program<Backend>,
-  publicKey: PublicKey
-): Promise<TransactionSignature> => {
-  const [counterPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("counter")],
-    programId
-  );
-  const [registerationsPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("registerations")],
-    programId
-  );
-
-  const tx = await program.methods
-    .initialize()
-    .accountsPartial({
-      user: publicKey,
-      counter: counterPDA,
-      registerations: registerationsPDA,
-      systemProgram: SystemProgram.programId,
-    })
-    .transaction();
-
+  program: Program<Backend>
+): Promise<string> => {
   const connection = new Connection(
-    program.provider.connection.rpcEndpoint,
+    "https://api.devnet.solana.com",
     "confirmed"
   );
-  const { blockhash } = await connection.getRecentBlockhash();
 
-  tx.recentBlockhash = blockhash;
-  tx.feePayer = publicKey;
+  return await transact(async (wallet) => {
+    // Authorize and get user's public key
+    const authResult = await wallet.authorize({
+      chain: "solana:devnet",
+      identity: {
+        name: "Your App Name",
+        uri: "https://yourapp.com",
+        icon: "/icon.png",
+      },
+    });
 
-  const signedTx = await program.provider.wallet?.signTransaction(tx);
-  if (!signedTx) throw new Error("Failed to sign transaction");
+    // Decode the base64 string into a byte array
+    const decodedBytes = Base64.toUint8Array(authResult.accounts[0].address);
 
-  const signature = await connection.sendRawTransaction(signedTx.serialize());
-  await connection.confirmTransaction(signature);
+    //console.log("Pub ID", decodedBytes);
 
-  return signature;
+    const userPublicKey = new PublicKey(decodedBytes);
+
+    console.log("Pub Key", userPublicKey, programId);
+
+    // Find PDAs
+    const [counterPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("counter")],
+      programId
+    );
+    const [registerationsPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("registerations")],
+      programId
+    );
+
+    console.log("Found Program Address for Counter and Registerations");
+
+    // Build transaction
+    console.log("Calling initialize method...");
+    const tx = await program.methods
+      .initialize()
+      .accountsPartial({
+        user: userPublicKey,
+        counter: counterPDA,
+        registerations: registerationsPDA,
+        systemProgram: SystemProgram.programId,
+      })
+      .transaction();
+    console.log("Transaction built:", tx.instructions);
+
+    // Fetch blockhash
+    // const { blockhash } = await connection.getLatestBlockhash("confirmed");
+    // console.log("Blockhash fetched:", blockhash);
+    const block = await connection.getLatestBlockhashAndContext("confirmed");
+
+    console.log(block);
+
+    // const blockhash = await connection
+    //   .getLatestBlockhash("confirmed")
+    //   .then((result) => {
+    //     return result.blockhash;
+    //   });
+
+    // console.log("Blockhash fetched:", blockhash);
+
+    tx.recentBlockhash = "Hvak77GGNTqvmwgTFSRUc8p8EBeaNqwRfGt3Hn6Xu2cJ";
+    tx.feePayer = userPublicKey;
+
+    // Convert to versioned transaction
+    const msg = tx.compileMessage();
+    console.log("Message", msg);
+    const vtx = new VersionedTransaction(msg);
+    console.log("VTX", vtx);
+
+    // Sign and send transaction using wallet
+    const result = await wallet.signAndSendTransactions({
+      transactions: [vtx],
+    });
+
+    console.log(result[0]);
+
+    const signature = result[0];
+    await connection.confirmTransaction(signature, "confirmed");
+
+    console.log("Sign", signature);
+
+    return signature;
+  });
 };
+
+export const initializeChain = async (
+  program: Program<Backend>
+): Promise<string> => {
+  const connection = new Connection(
+    "https://api.devnet.solana.com",
+    "confirmed"
+  );
+
+  return await transact(async (wallet) => {
+    // Authorize and get user's public key
+    const authResult = await wallet.authorize({
+      chain: "solana:devnet",
+      identity: {
+        name: "Your App Name",
+        uri: "https://yourapp.com",
+        icon: "/icon.png",
+      },
+    });
+
+    // Decode the base64 string into a byte array
+    const decodedBytes = Base64.toUint8Array(authResult.accounts[0].address);
+
+    //console.log("Pub ID", decodedBytes);
+
+    const userPublicKey = new PublicKey(decodedBytes);
+
+    console.log("Pub Key", userPublicKey, programId);
+
+    // Find PDAs
+    const [counterPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("counter")],
+      programId
+    );
+    const [registerationsPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("registerations")],
+      programId
+    );
+
+    return "";
+  });
+};
+
+// export const initialize = async (
+//   program: Program<Backend>,
+//   publicKey: PublicKey
+// ): Promise<TransactionSignature> => {
+//   const [counterPDA] = PublicKey.findProgramAddressSync(
+//     [Buffer.from("counter")],
+//     programId
+//   );
+//   const [registerationsPDA] = PublicKey.findProgramAddressSync(
+//     [Buffer.from("registerations")],
+//     programId
+//   );
+
+//   const tx = await program.methods
+//     .initialize()
+//     .accountsPartial({
+//       user: publicKey,
+//       counter: counterPDA,
+//       registerations: registerationsPDA,
+//       systemProgram: SystemProgram.programId,
+//     })
+//     .transaction();
+
+//   const connection = new Connection(
+//     program.provider.connection.rpcEndpoint,
+//     "confirmed"
+//   );
+//   const { blockhash } = await connection.getRecentBlockhash();
+
+//   tx.recentBlockhash = blockhash;
+//   tx.feePayer = publicKey;
+
+//   const signedTx = await program.provider.wallet?.signTransaction(tx);
+//   if (!signedTx) throw new Error("Failed to sign transaction");
+
+//   const signature = await connection.sendRawTransaction(signedTx.serialize());
+//   await connection.confirmTransaction(signature);
+
+//   return signature;
+// };
 
 export const createPoll = async (
   program: Program<Backend>,
@@ -161,6 +307,7 @@ export const createPoll = async (
   start: number,
   end: number
 ): Promise<TransactionSignature> => {
+  //console.log("PID", programId, program.programId);
   const [counterPDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("counter")],
     programId
@@ -183,11 +330,11 @@ export const createPoll = async (
     })
     .rpc();
 
-  const connection = new Connection(
-    program.provider.connection.rpcEndpoint,
-    "confirmed"
-  );
-  await connection.confirmTransaction(tx, "finalized");
+  // const connection = new Connection(
+  //   program.provider.connection.rpcEndpoint,
+  //   "confirmed"
+  // );
+  // await connection.confirmTransaction(tx, "finalized");
 
   return tx;
 };

@@ -44,20 +44,19 @@ export default function create() {
   }, [counter]);
   return (
     <SafeAreaView className="flex-1 p-5 bg-white">
-      <View>
-        <Text size="2xl">
-          Create Poll {selectedAccount?.publicKey.toString()}
-          {" Counter "}
-          {counter?.toNumber()}
-        </Text>
+      <Text size="2xl">
+        Create Poll {selectedAccount?.publicKey.toString()}
+        {" Counter "}
+        {counter?.toNumber()}
+      </Text>
 
-        <View className="mt-5">
-          <Text size="lg">Description</Text>
-          <TextInput
-            className="p-2 border border-gray-300 rounded-md"
-            placeholder="Enter description"
-          />
-        </View>
+      <View className="gap-2 mt-5">
+        <Text size="lg">Description</Text>
+
+        <TextInput
+          className="p-2 border border-gray-100 rounded-md"
+          placeholder="Enter description"
+        />
       </View>
     </SafeAreaView>
   );
