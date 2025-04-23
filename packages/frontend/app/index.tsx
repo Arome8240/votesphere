@@ -132,7 +132,7 @@ export default function Index() {
             }}
           >
             <Text size="lg" className="text-blue-700">
-              Create Poll
+              {createPoll.isPending ? "Creating" : "Create Poll"}
             </Text>
           </Pressable>
         </View>
@@ -143,9 +143,14 @@ export default function Index() {
           ) : (polls?.data?.length ?? 0) < 1 ? (
             <Text>No Polls</Text>
           ) : (
-            <View>
+            <View className="gap-y-2">
               {polls?.data?.map((poll, index) => (
-                <Text key={index}>{poll.description}</Text>
+                <View
+                  key={index}
+                  className="p-4 border rounded-lg border-blue-50"
+                >
+                  <Text>{poll.description}</Text>
+                </View>
               ))}
             </View>
           )}

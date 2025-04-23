@@ -8,7 +8,6 @@ import { useMemo } from "react";
 import * as anchor from "@coral-xyz/anchor";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Poll } from "./interfaces";
-import { publicKey } from "@coral-xyz/anchor/dist/cjs/utils";
 
 // Create a poll
 // const createPoll = async (
@@ -67,23 +66,20 @@ export const usePoll = () => {
 
   const program = useMemo(() => {
     if (!provider) return;
-    return new Program<Backend>(idl as Backend, publicKey, provider);
+    return new Program<Backend>(idl as Backend, provider);
   }, [provider, pollProgramId]);
 
   const polls = useQuery({
     queryKey: ["poll"],
     enabled: !!program,
-    queryFn: async () => {
+    queryFn: async (): Promise<Poll[]> => {
       if (!program) {
         console.log("No Program");
-        return null;
+        return [];
       }
       const polls = await program.account.poll.all();
 
-      console.log(polls.length);
       const serializedPolls = serializedPoll(polls);
-
-      console.log(serializedPolls);
 
       return serializedPolls;
     },
@@ -91,7 +87,7 @@ export const usePoll = () => {
 
   const serializedPoll = (polls: any[]): Poll[] =>
     polls.map((c: any) => {
-      console.log("Raw Poll Data:", c.account);
+      //console.log("Raw Poll Data:", c.account);
       return {
         ...c.account,
         publicKey: c.publicKey.toBase58(),
@@ -106,7 +102,9 @@ export const usePoll = () => {
     queryKey: ["counter"],
     queryFn: async () => {
       if (!program) return null;
-      return await program.account.counter.fetch(counterPDA);
+      let counts = await program.account.counter.fetch(counterPDA);
+      console.log("My Counts", counts);
+      return counts;
     },
   });
 
