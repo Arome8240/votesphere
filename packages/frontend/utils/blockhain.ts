@@ -1,19 +1,22 @@
 import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import {
   Connection,
+  Keypair,
   PublicKey,
   SystemProgram,
+  Transaction,
+  TransactionMessage,
   TransactionSignature,
+  VersionedMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import idl from "../../backend/target/idl/backend.json";
 import { Backend } from "../../backend/target/types/backend";
 import { Candidate, Poll } from "@/utils/interfaces";
-import { useStore } from "@/store";
 
-let tx;
 const programId = new PublicKey(idl.address);
-const { setCandidates, setPoll } = useStore();
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "http://127.0.0.1:8899";
+const RPC_URL =
+  process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
 
 export const getProvider = (
   publicKey: PublicKey | null,
@@ -32,11 +35,14 @@ export const getProvider = (
     { commitment: "processed" }
   );
 
+  // Create program with IDL directly
   return new Program<Backend>(idl as any, provider);
 };
 
 export const getReadonlyProvider = (): Program<Backend> => {
+  console.log("Creating read-only provider with RPC_URL:", RPC_URL);
   const connection = new Connection(RPC_URL, "confirmed");
+  console.log("Connection created:", connection);
 
   // Use a dummy wallet for read-only operations
   const dummyWallet = {
@@ -52,8 +58,12 @@ export const getReadonlyProvider = (): Program<Backend> => {
   const provider = new AnchorProvider(connection, dummyWallet as any, {
     commitment: "processed",
   });
+  console.log("Provider created:", provider);
 
-  return new Program<Backend>(idl as any, provider);
+  // Create program with IDL directly
+  const program = new Program<Backend>(idl as any, provider);
+  console.log("Program created:", program);
+  return program;
 };
 
 export const getCounter = async (program: Program<Backend>): Promise<BN> => {
@@ -77,6 +87,31 @@ export const getCounter = async (program: Program<Backend>): Promise<BN> => {
   }
 };
 
+export const getProviderWithKeypair = (
+  publicKey: PublicKey | null,
+  signTransaction: any,
+  sendTransaction: any
+): Program<Backend> | null => {
+  if (!publicKey || !signTransaction) {
+    console.error("Wallet not connected or missing signTransaction.");
+    return null;
+  }
+
+  const connection = new Connection(RPC_URL);
+  const provider = new AnchorProvider(
+    connection,
+    {
+      publicKey: keypair.publicKey,
+      signTransaction,
+      sendTransaction,
+    } as unknown as Wallet,
+    { commitment: "processed" }
+  );
+
+  return new Program<Backend>(idl as any, provider);
+};
+const keypair = Keypair.generate();
+
 export const initialize = async (
   program: Program<Backend>,
   publicKey: PublicKey
@@ -90,7 +125,7 @@ export const initialize = async (
     programId
   );
 
-  tx = await program.methods
+  const tx = await program.methods
     .initialize()
     .accountsPartial({
       user: publicKey,
@@ -98,15 +133,24 @@ export const initialize = async (
       registerations: registerationsPDA,
       systemProgram: SystemProgram.programId,
     })
-    .rpc();
+    .transaction();
 
   const connection = new Connection(
     program.provider.connection.rpcEndpoint,
     "confirmed"
   );
-  await connection.confirmTransaction(tx, "finalized");
+  const { blockhash } = await connection.getRecentBlockhash();
 
-  return tx;
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = publicKey;
+
+  const signedTx = await program.provider.wallet?.signTransaction(tx);
+  if (!signedTx) throw new Error("Failed to sign transaction");
+
+  const signature = await connection.sendRawTransaction(signedTx.serialize());
+  await connection.confirmTransaction(signature);
+
+  return signature;
 };
 
 export const createPoll = async (
@@ -129,7 +173,7 @@ export const createPoll = async (
   const startBN = new BN(start);
   const endBN = new BN(end);
 
-  tx = await program.methods
+  const tx = await program.methods
     .createPoll(description, startBN, endBN)
     .accountsPartial({
       user: publicKey,
@@ -172,7 +216,7 @@ export const registerCandidate = async (
     programId
   );
 
-  tx = await program.methods
+  const tx = await program.methods
     .registerCandidate(PID, name)
     .accountsPartial({
       user: publicKey,
@@ -218,7 +262,7 @@ export const vote = async (
     programId
   );
 
-  tx = await program.methods
+  const tx = await program.methods
     .vote(PID, CID)
     .accountsPartial({
       user: publicKey,
@@ -241,8 +285,22 @@ export const vote = async (
 export const fetchAllPolls = async (
   program: Program<Backend>
 ): Promise<Poll[]> => {
-  const polls = await program.account.poll.all();
-  return serializedPoll(polls);
+  try {
+    console.log("[fetchAllPolls] Starting to fetch polls");
+    console.log("[fetchAllPolls] Program ID:", program.programId.toBase58());
+    console.log("[fetchAllPolls] Program account:", program.account);
+
+    const polls = await program.account.poll.all();
+    console.log("[fetchAllPolls] Raw polls data:", polls);
+
+    const serializedPolls = serializedPoll(polls);
+    console.log("[fetchAllPolls] Serialized polls:", serializedPolls);
+
+    return serializedPolls;
+  } catch (error) {
+    console.error("[fetchAllPolls] Error fetching polls:", error);
+    throw error;
+  }
 };
 
 export const fetchPollDetails = async (
@@ -260,7 +318,6 @@ export const fetchPollDetails = async (
     candidates: poll.candidates.toNumber(),
   };
 
-  setPoll(serialized);
   return serialized;
 };
 
@@ -274,6 +331,10 @@ const serializedPoll = (polls: any[]): Poll[] =>
     candidates: c.account.candidates.toNumber(),
   }));
 
+//   Program Id: Ar2FG8HLgS71AgzTs7nHWB5wQPi6sTh3EHJyfRsbHp2y
+
+// Signature: 462yARugZM3FQE4LNzpVCBxSAAaVc8TZCNVPAoxE7BPCzjqqc9A1Jc26Gg3ckrcLMk9Uf6SG8S23StsYhWRrcBuB
+
 export const fetchAllCandidates = async (
   program: Program<Backend>,
   pollAddress: string
@@ -285,23 +346,11 @@ export const fetchAllCandidates = async (
 
   const candidateAccounts = await program.account.candidate.all();
   const candidates = candidateAccounts.filter((candidate) => {
-    // Assuming the candidate account has a field `pollId` or equivalent
     return candidate.account.pollId.eq(PID);
   });
 
-  setCandidates(serializedCandidates(candidates));
   return candidates as unknown as Candidate[];
 };
-
-const serializedCandidates = (candidates: any[]): Candidate[] =>
-  candidates.map((c: any) => ({
-    ...c.account,
-    publicKey: c.publicKey.toBase58(), // Convert to string
-    cid: c.account.cid.toNumber(),
-    pollId: c.account.pollId.toNumber(),
-    votes: c.account.votes.toNumber(),
-    name: c.account.name,
-  }));
 
 export const hasUserVoted = async (
   program: Program<Backend>,

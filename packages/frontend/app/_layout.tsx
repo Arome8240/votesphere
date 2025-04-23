@@ -1,4 +1,4 @@
-//import "../index.js";
+import "../utils/polyfill";
 import { SplashScreen, Stack } from "expo-router";
 import "@/global.css";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
@@ -19,6 +19,7 @@ import {
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const queryClient = new QueryClient();
 
@@ -50,12 +51,13 @@ export default function RootLayout() {
         translucent
         backgroundColor={"transparent"}
       />
+
       <GluestackUIProvider mode="light">
         <GestureHandlerRootView style={{ flex: 1 }}>
           <QueryClientProvider client={queryClient}>
             <ClusterProvider>
               <ConnectionProvider config={{ commitment: "processed" }}>
-                <Stack />
+                <Stack screenOptions={{ headerShown: false }} />
               </ConnectionProvider>
             </ClusterProvider>
           </QueryClientProvider>

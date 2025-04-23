@@ -64,6 +64,21 @@ export function useMobileWallet() {
     [authorizeSession]
   );
 
+  const signTransaction = useCallback(
+    async (
+      transaction: Transaction | VersionedTransaction
+    ): Promise<Transaction | VersionedTransaction> => {
+      return await transact(async (wallet) => {
+        await authorizeSession(wallet);
+        const signedTxs = await wallet.signTransactions({
+          transactions: [transaction],
+        });
+        return signedTxs[0];
+      });
+    },
+    [authorizeSession]
+  );
+
   return useMemo(
     () => ({
       connect,
@@ -71,6 +86,7 @@ export function useMobileWallet() {
       disconnect,
       signAndSendTransaction,
       signMessage,
+      signTransaction,
     }),
     [signAndSendTransaction, signMessage]
   );
