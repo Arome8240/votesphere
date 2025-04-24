@@ -117,39 +117,42 @@ export default function Index() {
             </Pressable>
           )}
 
-          <Pressable
-            onPress={async () => {
-              try {
-                const result = await createPoll.mutateAsync({
-                  description: "Just testing",
-                  start,
-                  end,
-                });
-                console.log("Poll created successfully:", result);
-              } catch (error) {
-                console.error("Error creating poll:", error);
-              }
-            }}
-          >
-            <Text size="lg" className="text-blue-700">
-              {createPoll.isPending ? "Creating" : "Create Poll"}
-            </Text>
-          </Pressable>
+          <Link href={"/new"} asChild>
+            <Pressable android_ripple={{ color: "blue", radius: 5 }}>
+              <Text size="lg" className="text-blue-700">
+                {createPoll.isPending ? "Creating" : "Create Poll"}
+              </Text>
+            </Pressable>
+          </Link>
         </View>
 
-        <View>
+        <View className="mt-5">
           {polls.isPending ? (
             <Text size="2xl">Loading polls</Text>
           ) : (polls?.data?.length ?? 0) < 1 ? (
             <Text>No Polls</Text>
           ) : (
-            <View className="gap-y-2">
+            <View className="gap-y-4">
               {polls?.data?.map((poll, index) => (
-                <View
-                  key={index}
-                  className="p-4 border rounded-lg border-blue-50"
-                >
-                  <Text>{poll.description}</Text>
+                <View key={index}>
+                  <Link href={`/polls/${poll.publicKey}`} asChild>
+                    <Pressable
+                      android_ripple={{ color: "oklch(70.7% 0.165 254.624)" }}
+                      className="p-4 bg-blue-100 border border-blue-500 rounded-lg"
+                    >
+                      <Text bold={true} size="xl">
+                        {poll.description}
+                      </Text>
+                      <Text bold={true} size="lg">
+                        Candidates: {poll.candidates}
+                      </Text>
+                      <Text size="lg">{`Start : ${new Date(
+                        poll.start
+                      ).toLocaleDateString()} End : ${new Date(
+                        poll.end
+                      ).toLocaleDateString()}`}</Text>
+                    </Pressable>
+                  </Link>
                 </View>
               ))}
             </View>

@@ -14,140 +14,64 @@ import { useAuthorization } from "@/utils/useAuthorization";
 import { router } from "expo-router";
 import { useConnection } from "@/utils/ConnectionProvider";
 import { BN } from "@coral-xyz/anchor";
+import { usePoll } from "@/utils/useCreatePoll";
+import DatePicker from "@/components/ui/date-picker";
 
 export default function create() {
   const [description, setDescription] = useState("Text");
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(() => {
+  const [start, setStartDate] = useState(new Date());
+  const [end, setEndDate] = useState(() => {
     const date = new Date();
     date.setDate(date.getDate() + 7);
     return date;
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
-  const { selectedAccount, authorizeSession } = useAuthorization();
-  const { connection } = useConnection();
-  const { data: counter } = useQuery({
-    queryKey: ["counter", selectedAccount?.publicKey.toString()],
-    queryFn: async () => {
-      if (!selectedAccount) return null;
-      const program = getReadonlyProvider();
-      if (!program) return null;
-      return await getCounter(program);
-    },
-    enabled: !!selectedAccount,
-  });
-
-  const { data: polls, isLoading: isLoadingPolls } = useQuery({
-    queryKey: ["polls"],
-    queryFn: async () => {
-      const program = getReadonlyProvider();
-      if (!program) return [];
-      return await fetchAllPolls(program);
-    },
-  });
-
-  console.log(
-    "Polls:",
-    polls || "undefined",
-    "Counter:",
-    counter || "undefined"
-  );
-
-  useEffect(() => {
-    if (counter !== undefined && counter !== null) {
-      setIsInitialized(counter.toNumber() >= 0);
-    }
-  }, [counter]);
+  const { createPoll, count } = usePoll();
 
   const handleCreatePoll = async () => {
-    if (
-      !selectedAccount?.publicKey ||
-      !authorizeSession ||
-      !connection ||
-      !counter
-    ) {
-      Alert.alert("Error", "Please connect your wallet first");
-      return;
-    }
-
-    if (!description.trim()) {
-      Alert.alert("Error", "Please enter a description");
-      return;
-    }
-
-    if (startDate >= endDate) {
-      Alert.alert("Error", "End date must be after start date");
-      return;
-    }
-
     try {
-      setIsSubmitting(true);
-      const program = getProvider(
-        selectedAccount.publicKey,
-        authorizeSession,
-        connection.sendTransaction
-      );
-
-      if (!program) {
-        throw new Error("Failed to get program provider");
-      }
-
-      const nextCount = counter.add(new BN(1));
-      const startTimestamp = Math.floor(startDate.getTime() / 1000);
-      const endTimestamp = Math.floor(endDate.getTime() / 1000);
-
-      await createPoll(
-        program,
-        selectedAccount.publicKey,
-        nextCount,
-        description,
-        startTimestamp,
-        endTimestamp
-      );
-
-      Alert.alert("Success", "Poll created successfully", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
-    } catch (error: any) {
+      const result = await createPoll.mutateAsync({
+        description: description,
+        start: start.getTime() / 1000,
+        end: end.getTime() / 1000,
+      });
+      router.replace("/");
+      console.log("Poll created successfully:", result);
+    } catch (error) {
       console.error("Error creating poll:", error);
-      Alert.alert("Error", error.message || "Failed to create poll");
-    } finally {
-      setIsSubmitting(false);
     }
   };
+
   return (
-    <SafeAreaView className="flex-1 p-5 bg-red-500">
-      <Text size="2xl">
-        Create Poll {selectedAccount?.publicKey.toString()}
-        {" Counter "}
-        {counter?.toNumber()}
-      </Text>
+    <SafeAreaView className="flex-1 p-5 bg-white">
+      <Text size="2xl">Create Poll</Text>
 
-      <View className="gap-2 mt-5">
-        <Text size="lg">Description</Text>
+      <View className="gap-y-4 mt-5">
+        <View className="gap-2">
+          <Text size="lg">Description</Text>
+          <TextInput
+            className="p-4 border border-gray-100 rounded-md"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Enter description"
+          />{" "}
+        </View>
 
-        <TextInput
-          className="p-2 border border-gray-100 rounded-md"
-          placeholder="Enter description"
-        />
+        <DatePicker value={start} onValueChange={setStartDate} />
+        <DatePicker value={end} onValueChange={setEndDate} />
       </View>
 
       <Pressable
+        className="mt-5 "
         onPress={handleCreatePoll}
-        disabled={isSubmitting}
-        style={{ padding: 10, backgroundColor: "blue", borderRadius: 5 }}
+        disabled={!count.data?.count && createPoll.isPending}
+        style={{ padding: 16, backgroundColor: "blue", borderRadius: 10 }}
       >
         <Text
           style={{ color: "white", fontWeight: "bold", textAlign: "center" }}
           bold={true}
         >
-          Create Poll
+          {createPoll.isPending ? "Creating..." : "Create Poll"}
         </Text>
       </Pressable>
     </SafeAreaView>

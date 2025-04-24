@@ -45,7 +45,7 @@ import { Poll } from "./interfaces";
 
 const POLL_PROGRAM_ID = "Ar2FG8HLgS71AgzTs7nHWB5wQPi6sTh3EHJyfRsbHp2y";
 
-export const usePoll = () => {
+export const usePoll = (pollAddress?: string) => {
   const { connection } = useConnection();
   const anchorWallet = useAnchorWallet();
 
@@ -85,6 +85,32 @@ export const usePoll = () => {
     },
   });
 
+  const pollDetail = useQuery({
+    queryKey: ["poll-detail", pollAddress],
+    enabled: !!program && !!pollAddress,
+    queryFn: async (): Promise<Poll | null> => {
+      if (!pollAddress) throw new Error("Poll address is required");
+      const address = new PublicKey(pollAddress);
+
+      //console.log(address, pollAddress);
+
+      const poll = await program?.account.poll.fetch(address);
+
+      if (!poll) throw new Error("Poll not found");
+
+      const serialized: Poll = {
+        ...poll,
+        publicKey: pollAddress,
+        id: poll.id.toNumber(),
+        start: poll.start.toNumber() * 1000,
+        end: poll.end.toNumber() * 1000,
+        candidates: poll.candidates.toNumber(),
+      };
+
+      return serialized;
+    },
+  });
+
   const serializedPoll = (polls: any[]): Poll[] =>
     polls.map((c: any) => {
       //console.log("Raw Poll Data:", c.account);
@@ -103,7 +129,7 @@ export const usePoll = () => {
     queryFn: async () => {
       if (!program) return null;
       let counts = await program.account.counter.fetch(counterPDA);
-      console.log("My Counts", counts);
+      //console.log("My Counts", counts);
       return counts;
     },
   });
@@ -187,6 +213,7 @@ export const usePoll = () => {
     createPoll,
     polls,
     createCounter,
+    pollDetail,
     // fetchPoll,
     // voteOnPoll,
     // closePoll,
