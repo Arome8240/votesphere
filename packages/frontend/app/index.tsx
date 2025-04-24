@@ -2,7 +2,7 @@ import { Text } from "@/components/ui/text";
 import { useAuthorization } from "@/utils/useAuthorization";
 import { useMobileWallet } from "@/utils/useMobileWallet";
 import { Link } from "expo-router";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import React, { useCallback, useState } from "react";
 import { getProvider, initialize } from "@/utils/blockhain";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -132,30 +132,35 @@ export default function Index() {
           ) : (polls?.data?.length ?? 0) < 1 ? (
             <Text>No Polls</Text>
           ) : (
-            <View className="gap-y-4">
-              {polls?.data?.map((poll, index) => (
-                <View key={index}>
-                  <Link href={`/polls/${poll.publicKey}`} asChild>
-                    <Pressable
-                      android_ripple={{ color: "oklch(70.7% 0.165 254.624)" }}
-                      className="p-4 bg-blue-100 border border-blue-500 rounded-lg"
-                    >
-                      <Text bold={true} size="xl">
-                        {poll.description}
-                      </Text>
-                      <Text bold={true} size="lg">
-                        Candidates: {poll.candidates}
-                      </Text>
-                      <Text size="lg">{`Start : ${new Date(
-                        poll.start
-                      ).toLocaleDateString()} End : ${new Date(
-                        poll.end
-                      ).toLocaleDateString()}`}</Text>
-                    </Pressable>
-                  </Link>
-                </View>
-              ))}
-            </View>
+            <ScrollView
+              className="gap-y-4"
+              showsVerticalScrollIndicator={false}
+            >
+              <View className="gap-y-4">
+                {polls?.data?.map((poll, index) => (
+                  <View key={index}>
+                    <Link href={`/polls/${poll.publicKey}`} asChild>
+                      <Pressable
+                        android_ripple={{ color: "oklch(70.7% 0.165 254.624)" }}
+                        className="p-4 bg-blue-100 border border-blue-500 rounded-lg"
+                      >
+                        <Text bold={true} size="xl">
+                          {poll.description}
+                        </Text>
+                        <Text bold={true} size="lg">
+                          Candidates: {poll.candidates}
+                        </Text>
+                        <Text size="lg">{`Start : ${new Date(
+                          poll.start
+                        ).toLocaleDateString()} End : ${new Date(
+                          poll.end
+                        ).toLocaleDateString()}`}</Text>
+                      </Pressable>
+                    </Link>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
           )}
 
           {polls.isError && (
