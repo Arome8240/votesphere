@@ -7,11 +7,12 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { Program } from "@coral-xyz/anchor";
-import { Backend } from "../../backend/target/types/backend";
+import idl from "@/idl/idl/backend.json";
+import { Backend } from "@/idl/types/backend";
 
 const RPC_URL = "https://api.devnet.solana.com";
 const programId = new PublicKey(
-  require("../../backend/target/idl/backend.json").address
+  require("@/idl/idl/backend.json").address
 );
 
 export const useInitialize = async (

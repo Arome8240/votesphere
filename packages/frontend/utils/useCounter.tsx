@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { Backend } from "../../backend/target/types/backend";
+import { Backend } from "@/idl/types/backend";
 import { BN } from "@coral-xyz/anchor";
 
 interface CounterState {

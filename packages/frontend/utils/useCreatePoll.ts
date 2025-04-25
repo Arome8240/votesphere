@@ -1,7 +1,7 @@
 import { Program, BN, AnchorProvider } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { Backend } from "../../backend/target/types/backend";
-import idl from "../../backend/target/idl/backend.json";
+import idl from "@/idl/idl/backend.json";
+import { Backend } from "@/idl/types/backend";
 import { useConnection } from "./ConnectionProvider";
 import { useAnchorWallet } from "./useAnchorWallet";
 import { useMemo } from "react";

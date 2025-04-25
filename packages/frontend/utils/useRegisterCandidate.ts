@@ -1,11 +1,9 @@
 import { BN } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { Backend } from "../../backend/target/types/backend";
+import { Backend } from "@/idl/types/backend";
 
-const programId = new PublicKey(
-  require("../../backend/target/idl/backend.json").address
-);
+const programId = new PublicKey(require("@/idl/idl/backend.json").address);
 
 export const useRegisterCandidate = async (
   program: Program<Backend>,

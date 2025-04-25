@@ -11,8 +11,8 @@ import {
   VersionedMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import idl from "../../backend/target/idl/backend.json";
-import { Backend } from "../../backend/target/types/backend";
+import idl from "@/idl/idl/backend.json";
+import { Backend } from "@/idl/types/backend";
 import { Candidate, Poll } from "@/utils/interfaces";
 import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
 import { Base64 } from "js-base64";
